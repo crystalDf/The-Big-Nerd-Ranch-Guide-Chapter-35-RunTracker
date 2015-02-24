@@ -8,6 +8,8 @@ import android.location.Location;
 import android.os.Bundle;
 import android.support.annotation.Nullable;
 import android.support.v4.app.Fragment;
+import android.support.v4.app.LoaderManager;
+import android.support.v4.content.Loader;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -18,6 +20,9 @@ import android.widget.Toast;
 public class RunFragment extends Fragment {
 
     public static final String EXTRA_RUN_ID = "com.star.runtracker.run_id";
+
+    private static final int LOAD_RUN = 1;
+    private static final int LOAD_LOCATION = 2;
 
     private Button mStartButton, mStopButton;
     private TextView mStartedTextView, mLatitudeTextView, mLongitudeTextView,
@@ -39,8 +44,9 @@ public class RunFragment extends Fragment {
         long runId = getActivity().getIntent().getLongExtra(EXTRA_RUN_ID, 0);
 
         if (runId != 0) {
-            mRun = mRunManager.getRun(runId);
-            mLastLocation = mRunManager.getLastLocationForRun(mRun.getId());
+            LoaderManager loaderManager = getLoaderManager();
+            loaderManager.initLoader(LOAD_RUN, null, mRunLoaderCallbacks);
+            loaderManager.initLoader(LOAD_LOCATION, null, mLocationLoaderCallbacks);
         }
     }
 
@@ -84,7 +90,7 @@ public class RunFragment extends Fragment {
         boolean trackingThisRun = mRunManager.isTrackingRun(mRun);
 
         mStartButton.setEnabled(!started);
-        mStopButton.setEnabled(started && trackingThisRun);
+        mStopButton.setEnabled(trackingThisRun);
 
         if (mRun != null) {
             mStartedTextView.setText(mRun.getFormattedDate());
@@ -145,4 +151,76 @@ public class RunFragment extends Fragment {
         getActivity().unregisterReceiver(mLocationReceiver);
         super.onStop();
     }
+
+    private static class RunLoader extends DataLoader<Run> {
+
+        private long mRunId;
+
+        public RunLoader(Context context, long runId) {
+            super(context);
+            mRunId = runId;
+        }
+
+        @Override
+        public Run loadInBackground() {
+            return RunManager.getInstance(getContext())
+                    .getRun(mRunId);
+        }
+    }
+
+    private LoaderManager.LoaderCallbacks<Run> mRunLoaderCallbacks =
+            new LoaderManager.LoaderCallbacks<Run>() {
+                @Override
+                public Loader<Run> onCreateLoader(int id, Bundle args) {
+                    return new RunLoader(getActivity(),
+                            getActivity().getIntent().getLongExtra(EXTRA_RUN_ID, 0));
+                }
+
+                @Override
+                public void onLoadFinished(Loader<Run> loader, Run data) {
+                    mRun = data;
+                    updateUI();
+                }
+
+                @Override
+                public void onLoaderReset(Loader<Run> loader) {
+
+                }
+            };
+
+    private static class LastLocationLoader extends DataLoader<Location> {
+
+        private long mRunId;
+
+        public LastLocationLoader(Context context, long runId) {
+            super(context);
+            mRunId = runId;
+        }
+
+        @Override
+        public Location loadInBackground() {
+            return RunManager.getInstance(getContext())
+                    .getLastLocationForRun(mRunId);
+        }
+    }
+
+    private LoaderManager.LoaderCallbacks<Location> mLocationLoaderCallbacks =
+            new LoaderManager.LoaderCallbacks<Location>() {
+                @Override
+                public Loader<Location> onCreateLoader(int id, Bundle args) {
+                    return new LastLocationLoader(getActivity(),
+                            getActivity().getIntent().getLongExtra(EXTRA_RUN_ID, 0));
+                }
+
+                @Override
+                public void onLoadFinished(Loader<Location> loader, Location data) {
+                    mLastLocation = data;
+                    updateUI();
+                }
+
+                @Override
+                public void onLoaderReset(Loader<Location> loader) {
+
+                }
+            };
 }

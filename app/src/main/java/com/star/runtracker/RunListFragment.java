@@ -1,8 +1,6 @@
 package com.star.runtracker;
 
 
-import android.annotation.TargetApi;
-import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -10,14 +8,13 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.Resources;
 import android.database.Cursor;
-import android.graphics.Canvas;
 import android.graphics.Color;
-import android.graphics.ColorFilter;
-import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.os.Bundle;
 import android.support.v4.app.ListFragment;
+import android.support.v4.app.LoaderManager;
 import android.support.v4.app.NotificationCompat;
+import android.support.v4.content.Loader;
+import android.support.v4.widget.CursorAdapter;
 import android.support.v7.app.ActionBarActivity;
 import android.support.v7.view.ActionMode;
 import android.view.LayoutInflater;
@@ -27,7 +24,6 @@ import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.CursorAdapter;
 import android.widget.ListView;
 import android.widget.TextView;
 
@@ -35,7 +31,7 @@ public class RunListFragment extends ListFragment {
 
     private static final int REQUEST_NEW_RUN = 0;
 
-    private RunDatabaseHelper.RunCursor mRunCursor;
+    private static final int LOAD_RUNS = 1;
 
     private ActionMode mActionMode;
 
@@ -47,10 +43,7 @@ public class RunListFragment extends ListFragment {
 
         setHasOptionsMenu(true);
 
-        mRunCursor = RunManager.getInstance(getActivity()).queryRuns();
-
-        RunCursorAdapter adapter = new RunCursorAdapter(getActivity(), mRunCursor);
-        setListAdapter(adapter);
+        getLoaderManager().initLoader(LOAD_RUNS, null, mLoaderCallbacks);
     }
 
     @Override
@@ -69,7 +62,7 @@ public class RunListFragment extends ListFragment {
                 getListView().setChoiceMode(ListView.CHOICE_MODE_MULTIPLE);
                 getListView().setItemChecked(position, true);
 
-                ((ActionBarActivity)getActivity()).startSupportActionMode(new ActionMode.Callback() {
+                ((ActionBarActivity) getActivity()).startSupportActionMode(new ActionMode.Callback() {
 
                     @Override
                     public boolean onCreateActionMode(ActionMode actionMode, Menu menu) {
@@ -103,8 +96,7 @@ public class RunListFragment extends ListFragment {
                                     }
                                 }
                                 actionMode.finish();
-                                mRunCursor.requery();
-                                adapter.notifyDataSetChanged();
+                                getLoaderManager().restartLoader(LOAD_RUNS, null, mLoaderCallbacks);
                                 return true;
                             default:
                                 return false;
@@ -116,7 +108,7 @@ public class RunListFragment extends ListFragment {
                         getListView().clearChoices();
 
                         for (int i = 0; i < getListView().getChildCount(); i++) {
-                            getListView().getChildAt(i).getBackground().setState(new int[] {0});
+                            getListView().getChildAt(i).getBackground().setState(new int[]{0});
                         }
 
                         getListView().setChoiceMode(ListView.CHOICE_MODE_NONE);
@@ -177,17 +169,10 @@ public class RunListFragment extends ListFragment {
         notificationManager.notify(0, notification);
     }
 
-    @Override
-    public void onDestroy() {
-        mRunCursor.close();
-        super.onDestroy();
-    }
-
     private static class RunCursorAdapter extends CursorAdapter {
 
         private RunDatabaseHelper.RunCursor mRunCursor;
 
-        @TargetApi(Build.VERSION_CODES.HONEYCOMB)
         public RunCursorAdapter(Context context, RunDatabaseHelper.RunCursor runCursor) {
             super(context, runCursor, 0);
             mRunCursor = runCursor;
@@ -237,8 +222,7 @@ public class RunListFragment extends ListFragment {
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (REQUEST_NEW_RUN == requestCode) {
-            mRunCursor.requery();
-            ((RunCursorAdapter)getListAdapter()).notifyDataSetChanged();
+            getLoaderManager().restartLoader(LOAD_RUNS, null, mLoaderCallbacks);
         }
     }
 
@@ -250,4 +234,34 @@ public class RunListFragment extends ListFragment {
             startActivity(i);
         }
     }
+
+    private static class RunListCursorLoader extends SQLiteCursorLoader {
+
+        public RunListCursorLoader(Context context) {
+            super(context);
+        }
+
+        @Override
+        protected Cursor loadCursor() {
+            return RunManager.getInstance(getContext()).queryRuns();
+        }
+    }
+
+    private LoaderManager.LoaderCallbacks<Cursor> mLoaderCallbacks = new LoaderManager.LoaderCallbacks<Cursor>() {
+        @Override
+        public Loader<Cursor> onCreateLoader(int id, Bundle args) {
+            return new RunListCursorLoader(getActivity());
+        }
+
+        @Override
+        public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
+            RunCursorAdapter adapter = new RunCursorAdapter(getActivity(), (RunDatabaseHelper.RunCursor) data);
+            setListAdapter(adapter);
+        }
+
+        @Override
+        public void onLoaderReset(Loader<Cursor> loader) {
+            setListAdapter(null);
+        }
+    };
 }
