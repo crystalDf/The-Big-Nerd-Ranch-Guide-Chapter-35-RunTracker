@@ -43,7 +43,7 @@ public class RunListFragment extends ListFragment {
 
         setHasOptionsMenu(true);
 
-        getLoaderManager().initLoader(LOAD_RUNS, null, mLoaderCallbacks);
+//        getLoaderManager().initLoader(LOAD_RUNS, null, mLoaderCallbacks);
     }
 
     @Override
@@ -139,6 +139,8 @@ public class RunListFragment extends ListFragment {
     @Override
     public void onResume() {
         super.onResume();
+
+        getLoaderManager().initLoader(LOAD_RUNS, null, mLoaderCallbacks);
 
         long currentRunId = getActivity().getSharedPreferences(
                 RunManager.PREFS_FILE, Context.MODE_PRIVATE).getLong(
@@ -257,6 +259,7 @@ public class RunListFragment extends ListFragment {
         public void onLoadFinished(Loader<Cursor> loader, Cursor data) {
             RunCursorAdapter adapter = new RunCursorAdapter(getActivity(), (RunDatabaseHelper.RunCursor) data);
             setListAdapter(adapter);
+            System.out.println("hahaha: onLoadFinished done");
         }
 
         @Override
